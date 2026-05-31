@@ -1,0 +1,23 @@
+{
+  "name": "auto-research-orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Iterative research loop for Auto Research — runs inside a Daytona sandbox.",
+  "scripts": {
+    "dev": "tsx src/run.ts",
+    "build": "esbuild src/run.ts --bundle --platform=node --format=esm --target=node18 --outfile=dist/run.js --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openai": "^4.77.0",
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.24.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.5"
+  }
+}

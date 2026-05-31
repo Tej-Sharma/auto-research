@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Auto Research · Constella</title>
+  <link rel="stylesheet" href="/app/colors_and_type.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/app/app.css">
+  <link rel="icon" href="/app/assets/logo-icon.png">
+
+  <!-- InsForge config (Vite injects %VITE_*% at build/serve; ?run=<id> opens a live/archived run) -->
+  <script>
+    window.AR_CONFIG = {
+      insforgeUrl: "%VITE_INSFORGE_URL%",
+      anonKey: "%VITE_INSFORGE_ANON_KEY%",
+      runId: new URLSearchParams(location.search).get('run') || null,
+    };
+  </script>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root" data-screen-label="Auto Research Canvas"></div>
+
+  <script src="/app/i18n.js"></script>
+  <script src="/app/scenes.js"></script>
+  <script src="/app/timeline.js"></script>
+  <script src="/app/live.js"></script>
+  <script type="text/babel" src="/app/icons.jsx"></script>
+  <script type="text/babel" src="/app/nodes.jsx"></script>
+  <script type="text/babel" src="/app/edges.jsx"></script>
+  <script type="text/babel" src="/app/panels.jsx"></script>
+  <script type="text/babel" src="/app/paper-reader.jsx"></script>
+  <script type="text/babel" src="/app/tweaks-panel.jsx"></script>
+  <script type="text/babel" src="/app/app.jsx"></script>
+
+  <script type="text/babel">
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
