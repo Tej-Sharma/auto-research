@@ -1,77 +1,110 @@
 # Auto Research
 
-An agentic research canvas. You type a question; it **plans searches → scrapes the real web (TikTok / YouTube / web pages) → analyzes with an LLM → surfaces gaps → investigates whether each gap is already filled → derives sharper sub-gaps → iterates** until the gaps converge, then writes a final report. The whole investigation builds itself out live on a node canvas, with an **Open gaps** panel on the right and **market-gap tracking** that persists opportunities across runs.
+You type a question and Auto Research investigates it for you, live on a canvas. An LLM plans searches, **Apify** scrapes the real web (TikTok / YouTube / web pages), the LLM extracts findings, surfaces **gaps** (open problems / unmet needs), then probes each gap to decide whether someone already solved it — if a gap is only *partially* solved it derives a sharper sub-gap and **iterates** until the gaps converge, then writes a final report. The whole investigation animates itself out node-by-node, with an **Open gaps** panel on the right and cross-run **market-gap tracking**. It runs on four pieces: **web/** (the canvas, a Vite app), **InsForge** (database + realtime + the `start-run` edge function), **Daytona** (a sandbox that runs the orchestration loop), and **Apify + an LLM** (scraping + reasoning). Two modes: *academic* (find the thesis gap) and *market* (find the agent business to build).
 
-Two modes:
-- **Academic** — find the thesis-shaped gap in a research area (papers, findings, novel directions).
-- **Market** — find the agent businesses to build (social signals, unmet needs, competitive whitespace, business-plan CTAs).
+> Want to just see it? Jump to **Step 6** — the UI runs in demo mode with no setup.
 
-It is a real reimplementation of the Constella *Auto Research* design (see `docs/08-ui-spec.md`), driven by live data instead of baked scenes.
+## Step 1 — Prerequisites
 
-## The stack — what runs where
+- **Node.js 18+** and npm
+- Accounts/keys: **InsForge** (provided), **Apify** token, **Daytona** API key
+- The LLM runs through InsForge's built-in AI gateway, so no separate Anthropic key is needed
 
-| Layer | Tech | Responsibility |
-|------|------|----------------|
-| **UI** | Vite + React (`web/`) | The Constella canvas. Reads runs from InsForge, subscribes to **realtime** to animate the canvas live, kicks runs off via an edge function. |
-| **Data + bridge** | **InsForge** | Postgres (runs, searches, sources, findings, gaps, market_gaps, canvas_events, reports), realtime channels, auth, hosting, and the `start-run` edge function that holds secrets and launches Daytona. |
-| **Orchestration** | **Daytona** (`orchestrator/`) | The iterative research loop runs *inside a Daytona sandbox*. It calls Apify + Anthropic and writes progress to InsForge as it goes. |
-| **Scraping** | **Apify** | `clockworks/tiktok-scraper`, `streamers/youtube-scraper`, `apify/website-content-crawler`. |
-| **Reasoning** | **Anthropic** | `claude-opus-4-8` for every planning/extraction/analysis/judgment/synthesis step. |
+## Step 2 — Clone & install
 
-## Data flow (one run)
-
-```
- web (Run) ──▶ InsForge edge fn: start-run ──▶ Daytona: create sandbox + launch orchestrator
-                     │                                        │
-                     │                                        ▼
-                     │                     ┌──── iterate ────────────────────┐
-                     │                     │ LLM plan searches               │
-                     │                     │ Apify scrape (tiktok/yt/web)    │
-                     │                     │ LLM extract findings            │
-                     │                     │ LLM analyze + detect gaps       │
-                     │                     │ LLM judge gap: novel? addressed?│
-                     │                     │   partial → derive sub-gap ↺    │
-                     │                     │ LLM final report                │
-                     │                     └─────────────┬───────────────────┘
-                     ▼                                   ▼
-        InsForge tables  ◀──── writes rows + canvas_events ────  orchestrator
-                     │
-                     ▼  realtime channel  run:{id}
-        web canvas animates nodes/edges/gaps live  ──▶  results persist for later viewing
+```bash
+git clone https://github.com/Tej-Sharma/auto-research.git
+cd auto-research
+(cd web && npm install)
+(cd orchestrator && npm install)
 ```
 
-## Repository layout
+## Step 3 — Connect InsForge
+
+Log in and link the backend project. Linking also installs the InsForge agent skills and writes `.insforge/project.json` (git-ignored).
+
+```bash
+npx @insforge/cli login --user-api-key <YOUR_INSFORGE_USER_API_KEY>
+npx @insforge/cli link --project-id 53f5746b-2434-4f35-8ea5-74022c4749ec
+npx @insforge/cli ai setup        # writes OPENROUTER_API_KEY to .env.local (the LLM gateway)
+```
+
+## Step 4 — Create the database schema
+
+Applies the tables, row-level security, and the realtime channel (already defined in `migrations/`).
+
+```bash
+npx @insforge/cli db migrations up --all
+npx @insforge/cli metadata        # verify: 9 tables, no errors
+```
+
+## Step 5 — Add the secrets
+
+These are injected into the Daytona sandbox by the `start-run` edge function. `INSFORGE_SERVICE_KEY`, `OPENROUTER_API_KEY`, and `LLM_MODEL` are already set during Steps 3; add the two scraping/orchestration keys:
+
+```bash
+npx @insforge/cli secrets add APIFY_TOKEN     <YOUR_APIFY_TOKEN>
+npx @insforge/cli secrets add DAYTONA_API_KEY <YOUR_DAYTONA_API_KEY>
+npx @insforge/cli secrets list                # confirm they're stored
+```
+
+## Step 6 — Run the web app (demo mode)
+
+No backend needed — the canvas animates from built-in sample data.
+
+```bash
+cd web
+npm run dev          # http://localhost:5273
+```
+
+Open it, pick a topic, hit **Run**, and watch the canvas build out into the final report.
+
+## Step 7 — Point the web app at your InsForge project (for live runs)
+
+Create `web/.env.local` so the UI can read real runs:
+
+```bash
+# web/.env.local
+VITE_INSFORGE_URL=https://<your-app>.insforge.app      # oss_host from .insforge/project.json
+VITE_INSFORGE_ANON_KEY=<your-anon-key>                 # npx @insforge/cli secrets get ANON_KEY
+```
+
+## Step 8 — Deploy the orchestrator path
+
+Deploy the edge function that creates a run and launches the Daytona sandbox:
+
+```bash
+npx @insforge/cli functions deploy start-run --file insforge/functions/start-run/index.ts
+```
+
+## Step 9 — Run a real research
+
+From the UI (or by invoking `start-run`) start a run; you get back a `runId`. Open the canvas in **live mode** to watch the real orchestration animate:
+
+```
+http://localhost:5273/?run=<runId>
+```
+
+The orchestrator (in the Daytona sandbox) scrapes via Apify, reasons via the LLM, writes every step to InsForge, and the canvas replays it through the same animation. Results persist — reopen `?run=<runId>` any time.
+
+> Tip: develop the loop faster by running it locally first — copy `orchestrator/.env.example` to `orchestrator/.env`, fill it in, and `cd orchestrator && npm run dev`.
+
+## Project structure
 
 ```
 auto-research/
-├── README.md                 ← you are here
-├── docs/                     ← the full plan + spec (read 00 → 09 in order)
-│   ├── 00-overview.md
-│   ├── 01-architecture.md
-│   ├── 02-iteration-algorithm.md   ← the heart: the iterate-like-this loop
-│   ├── 03-data-model.md            ← InsForge tables
-│   ├── 04-insforge.md
-│   ├── 05-daytona.md
-│   ├── 06-apify.md
-│   ├── 07-anthropic-llm.md
-│   ├── 08-ui-spec.md               ← the Constella canvas spec
-│   └── 09-market-gap-tracking.md
-├── tasks/
-│   ├── todo.md               ← checkable build plan
-│   └── lessons.md
-├── web/                      ← frontend (Vite + React)
-├── orchestrator/             ← Daytona orchestration program
-├── insforge/                 ← schema migrations + edge functions
-└── .env.example
+├── docs/            full plan + spec (read 00 → 09 in order)
+├── web/             the Constella canvas (Vite) + InsForge live bridge
+├── orchestrator/    the iterative research loop (runs in Daytona)
+├── insforge/        edge function: start-run
+├── migrations/      InsForge schema (tables, RLS, realtime)
+└── tasks/           todo.md (build status) + lessons.md
 ```
 
-## Quickstart (build order)
+## Learn more
 
-1. Read `docs/00-overview.md` → `docs/02-iteration-algorithm.md`.
-2. InsForge: `npx @insforge/cli login` / `link` → apply `insforge/` schema → deploy `start-run`.
-3. `web/`: scaffold + port the canvas; point it at the InsForge project.
-4. `orchestrator/`: implement the loop; test locally, then run it in Daytona.
-5. Wire realtime end-to-end and verify a real run (`tasks/todo.md`).
-
-Secrets live in `.env` (never commit). See `.env.example`.
-# auto-research
+- **How the loop works:** `docs/02-iteration-algorithm.md`
+- **Architecture:** `docs/01-architecture.md`
+- **Each integration:** `docs/04-insforge.md`, `05-daytona.md`, `06-apify.md`, `07-anthropic-llm.md`
+- **The canvas:** `docs/08-ui-spec.md`
+- **Build status / what's left:** `tasks/todo.md`
